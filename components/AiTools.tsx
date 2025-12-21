@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { GeminiService } from '../services/geminiService';
 import { ImageSize, AspectRatio } from '../types';
-import { ImageIcon, Video, Send, Loader2, Key, Download, Sparkles } from 'lucide-react';
+import { ImageIcon, Video, Send, Loader2, Key, Download, Sparkles, Wand2, Music2 } from 'lucide-react';
 
 const AiTools: React.FC = () => {
   const [activeMode, setActiveMode] = useState<'image' | 'video'>('image');
@@ -14,10 +14,8 @@ const AiTools: React.FC = () => {
   const [uploadImage, setUploadImage] = useState<string | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
 
-  // Check if API key is already selected on mount to satisfy mandatory requirement
   useEffect(() => {
     const checkKey = async () => {
-      // Accessing aistudio via window as any to bypass duplicate declaration errors
       const aistudio = (window as any).aistudio;
       if (aistudio && typeof aistudio.hasSelectedApiKey === 'function') {
         const selected = await aistudio.hasSelectedApiKey();
@@ -31,7 +29,6 @@ const AiTools: React.FC = () => {
     const aistudio = (window as any).aistudio;
     if (aistudio && typeof aistudio.openSelectKey === 'function') {
       await aistudio.openSelectKey();
-      // Assume success after triggering the selection to avoid race condition issues
       setHasApiKey(true);
     }
   };
@@ -47,7 +44,6 @@ const AiTools: React.FC = () => {
           await aistudio.openSelectKey();
           setHasApiKey(true);
         }
-        // Attempt the request again after the key selection prompt
         try { await fn(); } catch (e) { alert("Erro ao processar: " + (e as Error).message); }
       } else {
         alert("Erro: " + error.message);
@@ -55,6 +51,13 @@ const AiTools: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const applyPreset = (mode: 'image' | 'video', text: string, ratio?: AspectRatio) => {
+    setActiveMode(mode);
+    setPrompt(text);
+    if (ratio) setSelectedRatio(ratio);
+    setResultUrl(null);
   };
 
   const handleGenerateImage = async () => {
@@ -81,7 +84,6 @@ const AiTools: React.FC = () => {
     }
   };
 
-  // Block access to advanced tools until an API key is selected as per mandatory instructions
   if (hasApiKey === false) {
     return (
       <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-slate-200 shadow-sm max-w-lg mx-auto text-center space-y-6 animate-in fade-in zoom-in duration-300">
@@ -138,47 +140,77 @@ const AiTools: React.FC = () => {
         {/* Input Panel */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
           {activeMode === 'video' && (
-            <div>
+            <div className="animate-in slide-in-from-top-2 duration-300">
               <label className="block text-sm font-bold text-slate-700 mb-2">Selecione a Imagem base</label>
               <input type="file" onChange={onFileChange} accept="image/*" className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
-              {uploadImage && <img src={uploadImage} className="mt-4 h-40 w-full object-cover rounded-lg border border-slate-100" alt="Preview" />}
+              {uploadImage && (
+                <div className="relative mt-4">
+                  <img src={uploadImage} className="h-40 w-full object-cover rounded-lg border border-slate-100" alt="Preview" />
+                  <button onClick={() => setUploadImage(null)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70"><Sparkles className="w-4 h-4" /></button>
+                </div>
+              )}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">Instrução (Prompt)</label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-sm font-bold text-slate-700">Instrução (Prompt)</label>
+              <Wand2 className="w-4 h-4 text-indigo-400" />
+            </div>
             <textarea
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               placeholder={activeMode === 'image' ? "Ex: Uma arte moderna para culto de jovens, luzes neon, instrumentos musicais..." : "Ex: Faça a pessoa na foto cantar e sorrir suavemente..."}
-              className="w-full h-32 px-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              className="w-full h-32 px-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 resize-none transition-all"
             />
+            
+            {/* Presets Section */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase w-full mb-1">Modelos rápidos:</span>
+              {activeMode === 'video' ? (
+                <button 
+                  onClick={() => applyPreset('video', "Pessoa sorrindo e cantando suavemente, iluminação cinematográfica de adoração, fundo com luzes quentes e desfoque suave, atmosfera espiritual de gratidão.", '9:16')}
+                  className="text-[11px] bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full border border-indigo-100 hover:bg-indigo-100 flex items-center gap-1.5 transition font-medium"
+                >
+                  <Music2 className="w-3 h-3" />
+                  Membro Cantando (9:16)
+                </button>
+              ) : (
+                <button 
+                  onClick={() => applyPreset('image', "Arte minimalista para fundo de projeção de igreja, cruz abstrata, cores suaves azul e roxo, luz volumétrica, alta qualidade, estilo contemporâneo.")}
+                  className="text-[11px] bg-slate-50 text-slate-700 px-3 py-1.5 rounded-full border border-slate-100 hover:bg-slate-100 flex items-center gap-1.5 transition font-medium"
+                >
+                  <ImageIcon className="w-3 h-3" />
+                  Background de Culto
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex gap-4">
             {activeMode === 'image' ? (
               <div className="flex-1">
-                <label className="block text-sm font-bold text-slate-700 mb-2">Tamanho</label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Qualidade</label>
                 <select 
                   value={selectedSize} 
                   onChange={e => setSelectedSize(e.target.value as ImageSize)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg outline-none"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg outline-none focus:border-indigo-500"
                 >
-                  <option value="1K">1K (Padrão)</option>
-                  <option value="2K">2K (High Res)</option>
-                  <option value="4K">4K (Ultra Res)</option>
+                  <option value="1K">1K (Redes Sociais)</option>
+                  <option value="2K">2K (Projeção)</option>
+                  <option value="4K">4K (Impressão/Banner)</option>
                 </select>
               </div>
             ) : (
               <div className="flex-1">
-                <label className="block text-sm font-bold text-slate-700 mb-2">Formato</label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Formato do Vídeo</label>
                 <select 
                   value={selectedRatio} 
                   onChange={e => setSelectedRatio(e.target.value as AspectRatio)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg outline-none"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg outline-none focus:border-indigo-500"
                 >
-                  <option value="16:9">Landscape (16:9)</option>
-                  <option value="9:16">Portrait (9:16)</option>
+                  <option value="16:9">Landscape (YouTube/TV)</option>
+                  <option value="9:16">Portrait (Reels/Stories)</option>
                 </select>
               </div>
             )}
@@ -187,50 +219,59 @@ const AiTools: React.FC = () => {
           <div className="bg-amber-50 p-3 rounded-lg flex items-start gap-3 border border-amber-100">
             <Key className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-700">
-              Modelos Gemini 3 Pro e Veo requerem uma <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="underline font-bold">API Key de projeto pago</a>.
+              Criações avançadas utilizam o <b>Gemini 3 Pro</b> ou <b>Veo</b>, requerendo sua chave de API pessoal.
             </p>
           </div>
 
           <button
             onClick={activeMode === 'image' ? handleGenerateImage : handleAnimateImage}
             disabled={isLoading || !prompt}
-            className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 transition disabled:opacity-50 shadow-lg shadow-indigo-100"
+            className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 transition disabled:opacity-50 shadow-lg shadow-indigo-200 active:scale-[0.98]"
           >
             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-            {isLoading ? "Processando..." : (activeMode === 'image' ? "Criar Imagem" : "Gerar Vídeo")}
+            {isLoading ? "Processando com IA..." : (activeMode === 'image' ? "Criar Arte" : "Gerar Animação")}
           </button>
         </div>
 
         {/* Result Panel */}
         <div className="bg-slate-100 rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center relative overflow-hidden min-h-[400px]">
           {isLoading ? (
-            <div className="text-center space-y-4">
-              <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto" />
-              <div className="animate-pulse space-y-2">
-                <p className="font-bold text-slate-800">A IA está processando...</p>
-                <p className="text-sm text-slate-500">Geração de vídeos pode levar alguns minutos.</p>
+            <div className="text-center space-y-4 p-8">
+              <div className="relative w-16 h-16 mx-auto">
+                <Loader2 className="w-16 h-16 text-indigo-600 animate-spin" />
+                <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-indigo-400 animate-pulse" />
+              </div>
+              <div className="space-y-2">
+                <p className="font-bold text-slate-800 text-lg">Inspirando a IA...</p>
+                <p className="text-sm text-slate-500 max-w-xs mx-auto">Isso pode levar alguns minutos dependendo da complexidade do vídeo.</p>
               </div>
             </div>
           ) : resultUrl ? (
             <div className="w-full h-full flex flex-col animate-in zoom-in duration-500 p-4">
               <div className="flex-1 flex items-center justify-center">
                 {activeMode === 'image' ? (
-                  <img src={resultUrl} className="max-w-full max-h-[500px] rounded-lg shadow-2xl" alt="IA Result" />
+                  <img src={resultUrl} className="max-w-full max-h-[500px] rounded-lg shadow-2xl border-4 border-white" alt="IA Result" />
                 ) : (
-                  <video src={resultUrl} controls autoPlay loop className="max-w-full max-h-[500px] rounded-lg shadow-2xl" />
+                  <video src={resultUrl} controls autoPlay loop className="max-w-full max-h-[500px] rounded-lg shadow-2xl border-4 border-white" />
                 )}
               </div>
-              <div className="mt-4 flex justify-end">
-                <a href={resultUrl} download="arte-louvor" className="bg-white px-4 py-2 rounded-lg border border-slate-200 flex items-center gap-2 hover:bg-slate-50 transition shadow-sm font-semibold">
+              <div className="mt-4 flex justify-between items-center">
+                <p className="text-xs text-slate-400 italic">Geração concluída com sucesso!</p>
+                <a href={resultUrl} download="arte-louvor" className="bg-indigo-600 text-white px-6 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition shadow-md font-semibold text-sm">
                   <Download className="w-4 h-4" />
-                  Salvar Resultado
+                  Baixar Arquivo
                 </a>
               </div>
             </div>
           ) : (
             <div className="text-center p-8 space-y-4">
-              <Sparkles className="w-12 h-12 text-slate-300 mx-auto" />
-              <p className="text-slate-400">O resultado aparecerá aqui após o processamento.</p>
+              <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center mx-auto">
+                <Sparkles className="w-10 h-10 text-slate-400" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-slate-500 font-medium">Pronto para criar?</p>
+                <p className="text-slate-400 text-sm max-w-[200px] mx-auto">Seu conteúdo gerado por IA aparecerá aqui em instantes.</p>
+              </div>
             </div>
           )}
         </div>

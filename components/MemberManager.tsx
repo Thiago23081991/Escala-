@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Member, Role } from '../types';
-import { Plus, Trash2, CalendarOff, X, Check, Users, UserPlus } from 'lucide-react';
+import { Plus, Trash2, CalendarOff, X, Check, Users, UserPlus, Settings2 } from 'lucide-react';
 
 interface Props {
   members: Member[];
@@ -15,6 +15,7 @@ const MemberManager: React.FC<Props> = ({ members, onAdd, onUpdate, onDelete }) 
   const [newName, setNewName] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<Role[]>([]);
   const [editingUnavail, setEditingUnavail] = useState<string | null>(null);
+  const [editingRoles, setEditingRoles] = useState<string | null>(null);
 
   const handleAdd = () => {
     if (!newName || selectedRoles.length === 0) return;
@@ -33,6 +34,23 @@ const MemberManager: React.FC<Props> = ({ members, onAdd, onUpdate, onDelete }) 
     setSelectedRoles(prev => 
       prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
     );
+  };
+
+  const toggleMemberRole = (memberId: string, role: Role) => {
+    const member = members.find(m => m.id === memberId);
+    if (!member) return;
+
+    const currentRoles = member.roles || [];
+    const newRoles = currentRoles.includes(role)
+      ? currentRoles.filter(r => r !== role)
+      : [...currentRoles, role];
+
+    if (newRoles.length === 0) return; // Mantém pelo menos uma função
+
+    onUpdate({
+      ...member,
+      roles: newRoles
+    });
   };
 
   const addUnavailableDate = (memberId: string, date: string) => {
@@ -130,27 +148,72 @@ const MemberManager: React.FC<Props> = ({ members, onAdd, onUpdate, onDelete }) 
                 <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center font-bold">
                   {member.name.charAt(0)}
                 </div>
-                <button
-                  onClick={() => onDelete(member.id)}
-                  className="text-slate-300 hover:text-red-500 transition p-1"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => {
+                      setEditingRoles(editingRoles === member.id ? null : member.id);
+                      setEditingUnavail(null);
+                    }}
+                    className={`p-1.5 rounded-lg transition ${editingRoles === member.id ? 'bg-indigo-100 text-indigo-600' : 'text-slate-300 hover:text-indigo-500'}`}
+                    title="Editar Funções"
+                  >
+                    <Settings2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onDelete(member.id)}
+                    className="text-slate-300 hover:text-red-500 transition p-1.5"
+                    title="Remover Membro"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
+              
               <h4 className="font-bold text-lg text-slate-800 mb-2">{member.name}</h4>
-              <div className="flex flex-wrap gap-1 mb-4">
-                {member.roles.map(role => (
-                  <span key={role} className="text-[10px] uppercase tracking-wider font-bold bg-slate-50 text-slate-500 border border-slate-100 px-2 py-0.5 rounded">
-                    {role}
-                  </span>
-                ))}
-              </div>
+              
+              {editingRoles === member.id ? (
+                <div className="mb-4 space-y-2 p-3 bg-slate-50 rounded-lg border border-slate-100 animate-in fade-in duration-200">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Selecionar Funções:</span>
+                  <div className="flex flex-wrap gap-1">
+                    {Object.values(Role).map(role => (
+                      <button
+                        key={role}
+                        onClick={() => toggleMemberRole(member.id, role)}
+                        className={`px-2 py-1 rounded text-[10px] font-bold transition border ${
+                          member.roles.includes(role)
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'
+                        }`}
+                      >
+                        {role}
+                      </button>
+                    ))}
+                  </div>
+                  <button 
+                    onClick={() => setEditingRoles(null)}
+                    className="w-full text-[10px] font-bold text-indigo-600 pt-1 hover:underline"
+                  >
+                    Finalizar Edição
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1 mb-4">
+                  {member.roles.map(role => (
+                    <span key={role} className="text-[10px] uppercase tracking-wider font-bold bg-slate-50 text-slate-500 border border-slate-100 px-2 py-0.5 rounded">
+                      {role}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               <div className="border-t border-slate-50 pt-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-slate-400 uppercase">Indisponibilidade</span>
                   <button 
-                    onClick={() => setEditingUnavail(editingUnavail === member.id ? null : member.id)}
+                    onClick={() => {
+                      setEditingUnavail(editingUnavail === member.id ? null : member.id);
+                      setEditingRoles(null);
+                    }}
                     className="text-xs text-indigo-600 font-semibold hover:underline"
                   >
                     {editingUnavail === member.id ? 'Fechar' : 'Editar'}
