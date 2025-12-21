@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Member, WorshipDate, ScheduleEntry, Role } from '../types';
+import { Member, WorshipDate, ScheduleEntry, Role } from '../types.ts';
 import { Calendar, RefreshCw, Download, CalendarPlus, Trash2, Info, Copy, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface Props {
@@ -78,7 +78,6 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
     console.group("Relatório de Geração de Escala (Lógica de Rotação)");
 
     setTimeout(() => {
-      // 1. Inicializar o histórico com base no que já está escalado (as últimas 3 entradas da lista atual)
       const history: Record<string, string[]> = {};
       Object.values(Role).forEach(role => {
         const lastThreeEntries = schedule.slice(-3);
@@ -87,8 +86,6 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
           .filter(name => name && name !== "⚠️ FALTA");
       });
 
-      console.log("Histórico inicial detectado das escalas anteriores:", history);
-
       const newScheduleEntries: ScheduleEntry[] = dates.map(worshipDate => {
         const assignments: Record<Role, string> = {} as any;
         const escaladosHoje = new Set<string>();
@@ -96,7 +93,6 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
         Object.values(Role).forEach(role => {
           const roleHistory = history[role] || [];
           
-          // Candidatos disponíveis (Sabem a função, podem na data, não estão em outro posto hoje)
           const candidates = members.filter(m => {
             const sabeFuncao = m.roles.includes(role);
             const unavail = m.unavailableDates || [];
@@ -106,27 +102,22 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
           });
 
           if (candidates.length > 0) {
-            // Priorizar quem NÃO tocou nas últimas 3 vezes desta função
             const priorityCandidates = candidates.filter(m => !roleHistory.includes(m.name));
             
             let selected;
             if (priorityCandidates.length > 0) {
               selected = priorityCandidates[Math.floor(Math.random() * priorityCandidates.length)];
-              console.log(`[${worshipDate.date}] ${role}: ✅ ${selected.name} (Prioritário - estava em descanso)`);
             } else {
               selected = candidates[Math.floor(Math.random() * candidates.length)];
-              console.warn(`[${worshipDate.date}] ${role}: ⚠️ ${selected.name} (Repetição necessária - ninguém mais disponível)`);
             }
 
             assignments[role] = selected.name;
             escaladosHoje.add(selected.id);
 
-            // Atualizar histórico rolante
             roleHistory.push(selected.name);
             if (roleHistory.length > 3) roleHistory.shift();
             history[role] = roleHistory;
           } else {
-            console.error(`[${worshipDate.date}] ${role}: ❌ NINGUÉM DISPONÍVEL`);
             assignments[role] = "⚠️ FALTA";
           }
         });
@@ -137,7 +128,6 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
         };
       });
 
-      // Substituir a escala antiga pela nova com as novas datas
       onScheduleUpdate(newScheduleEntries);
       setIsGenerating(false);
       console.groupEnd();

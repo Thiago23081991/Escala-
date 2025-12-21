@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { GeminiService } from '../services/geminiService';
-import { ImageSize, AspectRatio } from '../types';
+import { GeminiService } from '../services/geminiService.ts';
+import { ImageSize, AspectRatio } from '../types.ts';
 import { ImageIcon, Video, Send, Loader2, Key, Download, Sparkles, Wand2, Music2 } from 'lucide-react';
 
 const AiTools: React.FC = () => {

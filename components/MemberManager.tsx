@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Member, Role } from '../types';
+import { Member, Role } from '../types.ts';
 import { Plus, Trash2, CalendarOff, X, Check, Users, UserPlus, Settings2 } from 'lucide-react';
 
 interface Props {
@@ -45,7 +45,7 @@ const MemberManager: React.FC<Props> = ({ members, onAdd, onUpdate, onDelete }) 
       ? currentRoles.filter(r => r !== role)
       : [...currentRoles, role];
 
-    if (newRoles.length === 0) return; // Mantém pelo menos uma função
+    if (newRoles.length === 0) return;
 
     onUpdate({
       ...member,
@@ -252,13 +252,6 @@ const MemberManager: React.FC<Props> = ({ members, onAdd, onUpdate, onDelete }) 
             </div>
           </div>
         ))}
-        {members.length === 0 && !isAdding && (
-          <div className="col-span-full py-20 text-center bg-white rounded-xl border-2 border-dashed border-slate-200">
-            <Users className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-400">Nenhum músico cadastrado</h3>
-            <p className="text-slate-400 max-w-xs mx-auto text-sm">Comece adicionando os membros da equipe e suas funções.</p>
-          </div>
-        )}
       </div>
     </div>
   );

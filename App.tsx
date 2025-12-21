@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Member, WorshipDate, ScheduleEntry, Role } from './types';
-import MemberManager from './components/MemberManager';
-import ScheduleGenerator from './components/ScheduleGenerator';
-import AiTools from './components/AiTools';
-import { Music, Users, Calendar, Sparkles, LayoutDashboard } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Member, WorshipDate, ScheduleEntry } from './types.ts';
+import MemberManager from './components/MemberManager.tsx';
+import ScheduleGenerator from './components/ScheduleGenerator.tsx';
+import AiTools from './components/AiTools.tsx';
+import { Music, Users, Sparkles, LayoutDashboard } from 'lucide-react';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'members' | 'ai'>('dashboard');
@@ -35,7 +35,6 @@ const App: React.FC = () => {
   const deleteMember = (id: string) => setMembers(prev => prev.filter(m => m.id !== id));
 
   const addDate = (date: WorshipDate) => setWorshipDates(prev => [...prev, date]);
-  const deleteDate = (id: string) => setWorshipDates(prev => prev.filter(d => d.id !== id));
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 md:pb-0 md:pl-64">
