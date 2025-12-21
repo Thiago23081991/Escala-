@@ -1,0 +1,7 @@
+{
+  "name": "Gerador de Escala de Louvor AI",
+  "description": "Uma plataforma completa para gestão de equipes de louvor, geração inteligente de escalas e criação de artes e vídeos promocionais com IA.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
