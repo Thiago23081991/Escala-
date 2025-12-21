@@ -152,10 +152,9 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
     });
   };
 
-  const resetAll = () => {
-    if (confirm("Isso apagará TODOS os dados (Membros, Datas e Escalas). Tem certeza?")) {
-      localStorage.clear();
-      window.location.reload();
+  const clearScheduleOnly = () => {
+    if (confirm("Deseja limpar apenas a escala gerada? (As datas e membros serão mantidos)")) {
+      onScheduleUpdate([]);
     }
   };
 
@@ -176,10 +175,10 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
               Sugerir Datas (Ter, Qui, Dom)
             </button>
             <button
-              onClick={resetAll}
+              onClick={clearScheduleOnly}
               className="text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-600 px-3 py-2 rounded-lg border border-red-100 hover:bg-red-100 transition"
             >
-              Resetar Tudo
+              Limpar Escala
             </button>
           </div>
         </div>
