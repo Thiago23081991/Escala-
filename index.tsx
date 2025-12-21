@@ -3,20 +3,26 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 
-// Polyfill para evitar erro "process is not defined" no navegador
-// Added type casting to window to avoid TypeScript error "Property 'process' does not exist"
-if (typeof window !== 'undefined' && !(window as any).process) {
-  (window as any).process = { env: {} };
-}
+// O polyfill agora reside no index.html para maior segurança no carregamento.
 
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error("Could not find root element to mount to");
-}
+const init = () => {
+  const rootElement = document.getElementById('root');
+  if (!rootElement) {
+    console.error("Não foi possível encontrar o elemento root para montar o app.");
+    return;
+  }
 
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+  const root = ReactDOM.createRoot(rootElement);
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+};
+
+// Garante que o script rode após o carregamento do DOM
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
