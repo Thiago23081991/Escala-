@@ -5,7 +5,9 @@ export enum Role {
   VIOLAO = 'Violão',
   BAIXO = 'Baixo',
   BATERIA = 'Bateria',
-  BACKVOCAL = 'Backvocal'
+  BACKVOCAL = 'Backvocal',
+  TECNICO_SOM = 'Técnico Mesa de Som',
+  RODIE = 'Rodie'
 }
 
 export interface Member {

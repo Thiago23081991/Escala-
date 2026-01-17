@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Member, WorshipDate, ScheduleEntry, Role } from '../types.ts';
-import { Calendar, RefreshCw, Download, CalendarPlus, Trash2, Info, Copy, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Calendar, RefreshCw, Download, CalendarPlus, Trash2, Info, Copy, CheckCircle2, AlertTriangle, BarChart3 } from 'lucide-react';
 
 interface Props {
   members: Member[];
@@ -33,6 +33,23 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
     const dayNum = date.getDay(); 
     return [0, 2, 4].includes(dayNum);
   };
+
+  // Cálculo de estatísticas da escala atual
+  const stats = useMemo(() => {
+    const counts: Record<string, number> = {};
+    members.forEach(m => counts[m.name] = 0);
+    
+    // Fix: cast Object.values to string[] to ensure 'name' is treated as a valid string index.
+    schedule.forEach(entry => {
+      (Object.values(entry.assignments) as string[]).forEach(name => {
+        if (name && name !== "⚠️ FALTA" && counts[name] !== undefined) {
+          counts[name]++;
+        }
+      });
+    });
+    
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [schedule, members]);
 
   const addDate = () => {
     if (!newDate) return;
@@ -66,33 +83,34 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
 
   const generateSchedule = () => {
     if (members.length === 0) {
-      alert("Por favor, adicione membros na aba 'Membros' antes de gerar a escala.");
+      alert("Adicione membros antes de gerar a escala.");
       return;
     }
     if (dates.length === 0) {
-      alert("Adicione pelo menos uma data de culto.");
+      alert("Adicione pelo menos uma data.");
       return;
     }
 
     setIsGenerating(true);
-    console.group("Relatório de Geração de Escala (Lógica de Rotação)");
 
     setTimeout(() => {
-      const history: Record<string, string[]> = {};
-      Object.values(Role).forEach(role => {
-        const lastThreeEntries = schedule.slice(-3);
-        history[role] = lastThreeEntries
-          .map(entry => entry.assignments[role])
-          .filter(name => name && name !== "⚠️ FALTA");
-      });
+      const newScheduleEntries: ScheduleEntry[] = [];
+      const globalWorkload: Record<string, number> = {};
+      members.forEach(m => globalWorkload[m.id] = 0);
 
-      const newScheduleEntries: ScheduleEntry[] = dates.map(worshipDate => {
+      // Variável para rastrear quem tocou no ÚLTIMO culto processado
+      let lastDateAssignments: Set<string> = new Set();
+
+      // Processar cada data em ordem cronológica
+      dates.forEach((worshipDate, dateIdx) => {
         const assignments: Record<Role, string> = {} as any;
         const escaladosHoje = new Set<string>();
 
-        Object.values(Role).forEach(role => {
-          const roleHistory = history[role] || [];
-          
+        // Ordem de preenchimento das funções (pode influenciar prioridade)
+        const rolesOrder = Object.values(Role);
+
+        rolesOrder.forEach(role => {
+          // 1. Filtrar candidatos qualificados e disponíveis
           const candidates = members.filter(m => {
             const sabeFuncao = m.roles.includes(role);
             const unavail = m.unavailableDates || [];
@@ -102,36 +120,45 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
           });
 
           if (candidates.length > 0) {
-            const priorityCandidates = candidates.filter(m => !roleHistory.includes(m.name));
-            
-            let selected;
-            if (priorityCandidates.length > 0) {
-              selected = priorityCandidates[Math.floor(Math.random() * priorityCandidates.length)];
-            } else {
-              selected = candidates[Math.floor(Math.random() * candidates.length)];
-            }
+            // 2. Calcular SCORE para cada candidato (Quanto MENOR o score, MELHOR a prioridade)
+            const scoredCandidates = candidates.map(m => {
+              let score = globalWorkload[m.id] * 20; // Penaliza quem já tocou muito no total
+              
+              // Penalidade pesada se tocou no culto imediatamente anterior
+              if (lastDateAssignments.has(m.id)) {
+                score += 100;
+              }
+
+              // Adiciona um pequeno fator aleatório para desempatar e rotacionar
+              score += Math.random() * 5;
+
+              return { member: m, score };
+            });
+
+            // 3. Ordenar por score e pegar o melhor
+            scoredCandidates.sort((a, b) => a.score - b.score);
+            const selected = scoredCandidates[0].member;
 
             assignments[role] = selected.name;
             escaladosHoje.add(selected.id);
-
-            roleHistory.push(selected.name);
-            if (roleHistory.length > 3) roleHistory.shift();
-            history[role] = roleHistory;
+            globalWorkload[selected.id]++;
           } else {
             assignments[role] = "⚠️ FALTA";
           }
         });
 
-        return {
+        newScheduleEntries.push({
           date: worshipDate.date,
           assignments
-        };
+        });
+
+        // Atualizar quem tocou nesta data para ser a referência da próxima
+        lastDateAssignments = escaladosHoje;
       });
 
       onScheduleUpdate(newScheduleEntries);
       setIsGenerating(false);
-      console.groupEnd();
-    }, 800);
+    }, 600);
   };
 
   const copyToClipboard = () => {
@@ -139,7 +166,7 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
 
     let text = "🎵 *ESCALA DE LOUVOR*\n\n";
     schedule.forEach(entry => {
-      text += `📅 *${formatDateDisplay(entry.date)}* (${getDayOfWeek(entry.date)})\n`;
+      text += `📅 *${formatDateDisplay(entry.date)}* (${getDayOfWeek(entry.date).toUpperCase()})\n`;
       Object.entries(entry.assignments).forEach(([role, name]) => {
         text += `• ${role}: ${name}\n`;
       });
@@ -153,14 +180,15 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
   };
 
   const clearScheduleOnly = () => {
-    if (confirm("Deseja limpar apenas a escala gerada? (As datas e membros serão mantidos)")) {
+    if (confirm("Deseja limpar apenas a escala gerada?")) {
       onScheduleUpdate([]);
     }
   };
 
   return (
     <div className="space-y-8 pb-10">
-      <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+      {/* Configuração de Datas */}
+      <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <CalendarPlus className="w-5 h-5 text-indigo-600" />
@@ -172,7 +200,7 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
               className="text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition flex items-center gap-2"
             >
               <RefreshCw className="w-3 h-3" />
-              Sugerir Datas (Ter, Qui, Dom)
+              Sugerir Próximas Datas
             </button>
             <button
               onClick={clearScheduleOnly}
@@ -183,68 +211,64 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
           </div>
         </div>
 
-        <div className="flex flex-col gap-4">
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <input
-                type="date"
-                value={newDate}
-                onChange={e => setNewDate(e.target.value)}
-                className={`w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 ${
-                  newDate && !isWorshipDay(newDate) ? 'border-amber-300 bg-amber-50' : 'border-slate-200'
-                }`}
-              />
-              {newDate && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                    isWorshipDay(newDate) ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'
-                  }`}>
-                    {getDayOfWeek(newDate)}
-                  </span>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={addDate}
-              disabled={!newDate}
-              className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 font-bold"
-            >
-              Adicionar
-            </button>
+        <div className="flex gap-2">
+          <div className="flex-1 relative">
+            <input
+              type="date"
+              value={newDate}
+              onChange={e => setNewDate(e.target.value)}
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+            />
           </div>
+          <button
+            onClick={addDate}
+            disabled={!newDate}
+            className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 font-bold"
+          >
+            Adicionar
+          </button>
         </div>
 
         <div className="flex flex-wrap gap-2 mt-6">
           {dates.map(d => (
-            <div key={d.id} className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 group hover:border-indigo-300 transition shadow-sm">
+            <div key={d.id} className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 hover:border-indigo-300 transition shadow-sm">
               <div className="flex flex-col">
-                <span className="text-sm font-bold text-slate-800">
-                  {formatDateDisplay(d.date)}
-                </span>
-                <span className="text-[9px] uppercase font-bold text-slate-400">
-                  {getDayOfWeek(d.date)}
-                </span>
+                <span className="text-sm font-bold text-slate-800">{formatDateDisplay(d.date)}</span>
+                <span className="text-[9px] uppercase font-bold text-slate-400">{getDayOfWeek(d.date)}</span>
               </div>
-              <button
-                onClick={() => removeDate(d.id)}
-                className="text-slate-300 hover:text-red-500 transition p-1"
-              >
+              <button onClick={() => removeDate(d.id)} className="text-slate-300 hover:text-red-500 transition p-1">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
-          {dates.length === 0 && (
-            <div className="text-center w-full py-4 border border-dashed border-slate-200 rounded-lg">
-              <p className="text-sm text-slate-400 italic">Nenhuma data selecionada para a escala.</p>
-            </div>
-          )}
         </div>
       </section>
 
+      {/* Estatísticas de Equilíbrio */}
+      {schedule.length > 0 && (
+        <section className="bg-indigo-900 text-white p-6 rounded-2xl shadow-xl animate-in fade-in zoom-in duration-500">
+          <div className="flex items-center gap-3 mb-4">
+            <BarChart3 className="w-6 h-6 text-indigo-300" />
+            <h3 className="text-lg font-bold">Equilíbrio da Escala</h3>
+          </div>
+          <p className="text-indigo-200 text-xs mb-4">Veja quantas vezes cada pessoa foi escalada para garantir um sorteio justo:</p>
+          <div className="flex flex-wrap gap-3">
+            {stats.map(([name, count]) => (
+              <div key={name} className="bg-indigo-800/50 border border-indigo-700/50 px-3 py-2 rounded-xl flex items-center gap-3">
+                <span className="text-sm font-medium">{name}</span>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${count > 0 ? 'bg-indigo-500' : 'bg-slate-700'}`}>
+                  {count}x
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Cabeçalho da Escala */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          Escala Semanal
-          {schedule.length > 0 && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
+          Escala de Louvor
         </h2>
         <div className="flex gap-2 w-full md:w-auto">
           {schedule.length > 0 && (
@@ -255,24 +279,25 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
               }`}
             >
               {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {copied ? 'Copiado!' : 'Copiar para WhatsApp'}
+              {copied ? 'Copiado!' : 'Copiar p/ WhatsApp'}
             </button>
           )}
           <button
             onClick={generateSchedule}
             disabled={isGenerating}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-100 disabled:opacity-50"
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-100 disabled:opacity-50 active:scale-95"
           >
             <RefreshCw className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
-            {isGenerating ? 'Sorteando...' : 'Gerar Escala'}
+            {isGenerating ? 'Equilibrando...' : 'Gerar Escala'}
           </button>
         </div>
       </div>
 
+      {/* Lista da Escala */}
       <div className="grid gap-6">
         {schedule.map((entry, idx) => (
-          <div key={idx} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:border-indigo-200 transition">
-            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+          <div key={idx} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:border-indigo-200 transition group">
+            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center group-hover:bg-indigo-50/30 transition">
               <div className="flex items-center gap-3">
                 <div className="bg-indigo-600 text-white px-3 py-1 rounded-lg font-bold text-sm">
                   {formatDateDisplay(entry.date).split('/')[0]}
@@ -283,17 +308,18 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
                 </div>
               </div>
               <div className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase ${isWorshipDay(entry.date) ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-500'}`}>
-                {isWorshipDay(entry.date) ? 'Culto Oficial' : 'Evento Extra'}
+                {isWorshipDay(entry.date) ? 'Culto Oficial' : 'Extra'}
               </div>
             </div>
-            <div className="p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {/* Grid ajustado para 4 colunas (agora com 8 funções no total) */}
+            <div className="p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {Object.entries(entry.assignments).map(([role, name]) => (
                 <div key={role} className="flex flex-col gap-1">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{role}</span>
-                  <div className={`px-3 py-2 rounded-lg border text-sm font-semibold truncate ${
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{role}</span>
+                  <div className={`px-3 py-2 rounded-lg border text-sm font-semibold truncate transition ${
                     name === '⚠️ FALTA' 
                       ? 'bg-red-50 text-red-600 border-red-100 italic' 
-                      : 'bg-white text-slate-800 border-slate-100'
+                      : 'bg-white text-slate-800 border-slate-100 group-hover:border-indigo-100'
                   }`}>
                     {name}
                   </div>
@@ -306,8 +332,8 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
         {schedule.length === 0 && (
           <div className="py-20 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
             <RefreshCw className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-400">Escala não gerada</h3>
-            <p className="text-slate-400 text-sm">Selecione as datas acima e clique em "Gerar Escala" para começar.</p>
+            <h3 className="text-lg font-bold text-slate-400">Nenhuma escala gerada</h3>
+            <p className="text-slate-400 text-sm">Clique em "Gerar Escala" para distribuir os membros nas datas.</p>
           </div>
         )}
       </div>
