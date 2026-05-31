@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Member, WorshipDate, ScheduleEntry, Role } from '../types.ts';
-import { Calendar, RefreshCw, Download, CalendarPlus, Trash2, Info, Copy, CheckCircle2, AlertTriangle, BarChart3 } from 'lucide-react';
+import { Calendar, RefreshCw, Download, CalendarPlus, Trash2, Info, Copy, CheckCircle2, AlertTriangle, BarChart3, MessageCircle, Mail } from 'lucide-react';
 
 interface Props {
   members: Member[];
@@ -103,16 +103,26 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
 
       // Processar cada data em ordem cronológica
       dates.forEach((worshipDate, dateIdx) => {
-        const assignments: Record<Role, string> = {} as any;
+        const assignments: Record<string, string> = {};
         const escaladosHoje = new Set<string>();
 
         // Ordem de preenchimento das funções (pode influenciar prioridade)
-        const rolesOrder = Object.values(Role);
+        const rolesOrder = [
+          { key: Role.MINISTRO, requiredSkill: Role.MINISTRO },
+          { key: Role.TECLADO, requiredSkill: Role.TECLADO },
+          { key: Role.VIOLAO, requiredSkill: Role.VIOLAO },
+          { key: Role.BAIXO, requiredSkill: Role.BAIXO },
+          { key: Role.BATERIA, requiredSkill: Role.BATERIA },
+          { key: 'Backvocal 1', requiredSkill: Role.BACKVOCAL },
+          { key: 'Backvocal 2', requiredSkill: Role.BACKVOCAL },
+          { key: Role.TECNICO_SOM, requiredSkill: Role.TECNICO_SOM },
+          { key: Role.RODIE, requiredSkill: Role.RODIE }
+        ];
 
-        rolesOrder.forEach(role => {
+        rolesOrder.forEach(({ key, requiredSkill }) => {
           // 1. Filtrar candidatos qualificados e disponíveis
           const candidates = members.filter(m => {
-            const sabeFuncao = m.roles.includes(role);
+            const sabeFuncao = m.roles.includes(requiredSkill);
             const unavail = m.unavailableDates || [];
             const podeData = !unavail.includes(worshipDate.date);
             const jaEscaladoHoje = escaladosHoje.has(m.id);
@@ -139,11 +149,11 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
             scoredCandidates.sort((a, b) => a.score - b.score);
             const selected = scoredCandidates[0].member;
 
-            assignments[role] = selected.name;
+            assignments[key] = selected.name;
             escaladosHoje.add(selected.id);
             globalWorkload[selected.id]++;
           } else {
-            assignments[role] = "⚠️ FALTA";
+            assignments[key] = "⚠️ FALTA";
           }
         });
 
@@ -313,18 +323,47 @@ const ScheduleGenerator: React.FC<Props> = ({ members, dates, onDatesUpdate, onS
             </div>
             {/* Grid ajustado para 4 colunas (agora com 8 funções no total) */}
             <div className="p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {Object.entries(entry.assignments).map(([role, name]) => (
-                <div key={role} className="flex flex-col gap-1">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{role}</span>
-                  <div className={`px-3 py-2 rounded-lg border text-sm font-semibold truncate transition ${
-                    name === '⚠️ FALTA' 
-                      ? 'bg-red-50 text-red-600 border-red-100 italic' 
-                      : 'bg-white text-slate-800 border-slate-100 group-hover:border-indigo-100'
-                  }`}>
-                    {name}
+              {Object.entries(entry.assignments).map(([role, name]) => {
+                const member = members.find(m => m.name === name);
+                const showNotify = name !== '⚠️ FALTA' && member && (member.phone || member.email);
+                
+                return (
+                  <div key={role} className="flex flex-col gap-1">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{role}</span>
+                    <div className={`px-3 py-2 rounded-lg border text-sm flex items-center justify-between gap-2 transition ${
+                      name === '⚠️ FALTA' 
+                        ? 'bg-red-50 text-red-600 border-red-100 italic' 
+                        : 'bg-white text-slate-800 border-slate-100 group-hover:border-indigo-100 font-semibold'
+                    }`}>
+                      <span className="truncate flex-1">{name}</span>
+                      {showNotify && (
+                        <div className="flex items-center gap-1">
+                          {member.phone && (
+                            <a 
+                              href={`https://wa.me/55${member.phone.replace(/\\D/g, '')}?text=${encodeURIComponent(`Olá ${member.name}, você foi escalado(a) para o culto na data ${formatDateDisplay(entry.date)} (${getDayOfWeek(entry.date)}) na função de ${role}. Contamos com você!`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-slate-300 hover:text-green-500 transition"
+                              title="WhatsApp"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                            </a>
+                          )}
+                          {member.email && (
+                            <a 
+                              href={`mailto:${member.email}?subject=${encodeURIComponent('Escala de Louvor')}&body=${encodeURIComponent(`Olá ${member.name},\n\nVocê foi escalado(a) para o culto na data ${formatDateDisplay(entry.date)} (${getDayOfWeek(entry.date)}) na função de ${role}.\n\nContamos com você!`)}`}
+                              className="text-slate-300 hover:text-indigo-500 transition"
+                              title="E-mail"
+                            >
+                              <Mail className="w-4 h-4" />
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ))}

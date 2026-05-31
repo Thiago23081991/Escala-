@@ -15,6 +15,8 @@ export interface Member {
   name: string;
   roles: Role[];
   unavailableDates: string[]; // ISO Strings
+  phone?: string;
+  email?: string;
 }
 
 export interface WorshipDate {
@@ -24,7 +26,7 @@ export interface WorshipDate {
 
 export interface ScheduleEntry {
   date: string;
-  assignments: Record<Role, string>; // Role -> Member ID or "⚠️ FALTA"
+  assignments: Record<string, string>; // Role -> Member ID or "⚠️ FALTA"
 }
 
 export type ImageSize = '1K' | '2K' | '4K';

@@ -13,6 +13,8 @@ interface Props {
 const MemberManager: React.FC<Props> = ({ members, onAdd, onUpdate, onDelete }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<Role[]>([]);
   const [editingUnavail, setEditingUnavail] = useState<string | null>(null);
   const [editingRoles, setEditingRoles] = useState<string | null>(null);
@@ -22,10 +24,14 @@ const MemberManager: React.FC<Props> = ({ members, onAdd, onUpdate, onDelete }) 
     onAdd({
       id: crypto.randomUUID(),
       name: newName,
+      phone: newPhone,
+      email: newEmail,
       roles: selectedRoles,
       unavailableDates: []
     });
     setNewName('');
+    setNewPhone('');
+    setNewEmail('');
     setSelectedRoles([]);
     setIsAdding(false);
   };
@@ -111,6 +117,28 @@ const MemberManager: React.FC<Props> = ({ members, onAdd, onUpdate, onDelete }) 
                 placeholder="Ex: João Silva"
               />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">WhatsApp</label>
+                <input
+                  type="tel"
+                  value={newPhone}
+                  onChange={e => setNewPhone(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                  placeholder="Ex: 11999999999"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={e => setNewEmail(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                  placeholder="Ex: joao@email.com"
+                />
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">O que esta pessoa toca/faz?</label>
               <div className="flex flex-wrap gap-2">
@@ -169,7 +197,17 @@ const MemberManager: React.FC<Props> = ({ members, onAdd, onUpdate, onDelete }) 
                 </div>
               </div>
               
-              <h4 className="font-bold text-lg text-slate-800 mb-2">{member.name}</h4>
+              <h4 className="font-bold text-lg text-slate-800 mb-1">{member.name}</h4>
+              <div className="flex flex-col gap-1 mb-3">
+                {(member.phone || member.email) ? (
+                  <>
+                    {member.phone && <span className="text-[10px] uppercase font-bold text-slate-400">📞 {member.phone}</span>}
+                    {member.email && <span className="text-[10px] uppercase font-bold text-slate-400">✉️ {member.email}</span>}
+                  </>
+                ) : (
+                  <span className="text-[10px] uppercase font-bold text-slate-300">Sem contato cadastrado</span>
+                )}
+              </div>
               
               {editingRoles === member.id ? (
                 <div className="mb-4 space-y-2 p-3 bg-slate-50 rounded-lg border border-slate-100 animate-in fade-in duration-200">
